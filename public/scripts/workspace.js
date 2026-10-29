@@ -1,11 +1,12 @@
 import {
     characters, closeCurrentChat, doNavbarIconClick, event_types, eventSource,
     getCurrentChatId, getThumbnailUrl, main_api, name1, name2, newAssistantChat,
-    online_status, saveSettingsDebounced, selectCharacterById, setActiveCharacter, this_chid,
+    online_status, saveSettingsDebounced, selectCharacterById, setActiveCharacter, setActiveGroup, this_chid,
 } from '../script.js';
 import { addLocaleData, applyLocale, getCurrentLocale, t } from './i18n.js';
 import { openWelcomeScreen } from './welcome-screen.js';
-import { groups, selected_group } from './group-chats.js';
+import { groups, openGroupById, selected_group } from './group-chats.js';
+import { initializeWorkspacePages, isWorkspacePage, navigateWorkspace, restoreWorkspacePage, syncWorkspacePages } from './workspace-pages.js';
 
 const panelNames = {
     'ai-config-button': 'Response settings',
@@ -51,6 +52,30 @@ const chinese = {
     'Try another name or import a new character.': '换个名字搜索，或导入新的角色。',
     'Choose a character to start a conversation.': '选择一个角色，开启对话。',
     'Go to character collection': '前往角色列表', 'Favorite': '收藏',
+    'Character library': '角色库', 'Settings': '设置', 'Back to chat': '返回对话', 'Back to home': '返回首页',
+    'Find a familiar voice or give someone new a story.': '遇见熟悉的声音，或为新角色开启一个故事。',
+    'Write the places, history, and details your characters should remember.': '记录角色应当记住的地点、历史和故事细节。',
+    'Choose who you are in each conversation.': '为每段对话选择你的身份。',
+    'Shape how your model writes and responds.': '调整模型的表达方式与回复风格。',
+    'Configure the context and instructions sent to your model.': '管理发送给模型的上下文与指令。',
+    'Connect a model and manage your connection profiles.': '连接模型，管理不同的连接方案。',
+    'Add new abilities and configure the tools in your workspace.': '为工作区添加新的能力，配置常用工具。',
+    'Choose the backdrop for your conversations.': '为你的对话选择合适的背景。',
+    'Make the workspace feel right for you.': '按你的习惯调整工作区。',
+    'Search by name or tag…': '搜索角色名称或标签…', 'Sort by': '排序',
+    'More character tools': '更多角色工具', 'Filter characters': '筛选角色',
+    'All characters': '全部角色', 'Create lorebook': '创建世界书', 'Edit character': '编辑角色',
+    'Bring your own model': '使用你选择的模型',
+    'Choose your provider, enter its connection details, then select a model. You can save different setups as connection profiles.': '选择服务商，填写连接信息，然后选择模型。不同的配置可以保存为独立的连接方案。',
+    'Connection guide': '连接指南', 'Search extensions': '搜索扩展', 'No matching extensions': '没有找到匹配的扩展',
+    'No groups here yet': '还没有聊天群组', 'No favorite characters yet': '还没有收藏角色',
+    'Try another search or add someone new to your collection.': '换个关键词搜索，或为角色库添加一个新角色。',
+    'Create a group': '创建群组', 'Show all characters': '查看全部角色',
+    'Groups': '聊天群组', 'Every world starts with a detail': '每个世界，都从一个细节开始',
+    'Create a lorebook or choose one above to start writing.': '创建一本世界书，或从上方选择已有的世界书，开始书写。',
+    '${0} characters': '${0} 个角色', '${0} groups': '${0} 个群组', '${0} members': '${0} 位成员',
+    '${0} character': '${0} 个角色', '${0} group': '${0} 个群组',
+    'Model connections': '模型连接', 'Installed extensions': '已安装扩展',
 };
 
 /** Escape dynamic text before inserting it in a template or attribute. */
@@ -77,16 +102,17 @@ function createShell() {
             <button type="button" class="ws-new-chat" data-workspace-action="assistant">${icon('plus')}<span>${escape(t`New chat`)}</span><kbd>⌘ ↵</kbd></button>
             <nav class="ws-main-nav" aria-label="${escape(t`Your workspace`)}">
                 ${actionButton('home', 'house', t`Home`, 'is-active')}
-                ${actionButton('characters', 'address-card', t`Characters`)}
+                ${actionButton('characters', 'address-card', t`Character library`)}
                 ${actionButton('worlds', 'book-open', t`World info`)}
                 ${actionButton('personas', 'user', t`Personas`)}
             </nav>
             <div class="ws-nav-section"><span>${escape(t`Tools & settings`)}</span>
                 ${actionButton('response', 'sliders', t`Response settings`)}
                 ${actionButton('formatting', 'font', t`Prompt format`)}
-                ${actionButton('connections', 'plug', t`Connections`)}
+                ${actionButton('connections', 'plug', t`Model connections`)}
                 ${actionButton('extensions', 'shapes', t`Extensions`)}
                 ${actionButton('backgrounds', 'image', t`Appearance`)}
+                ${actionButton('settings', 'gear', t`Settings`)}
             </div>
             <div class="ws-nav-section ws-collection-nav"><div class="ws-collection-label"><span>${escape(t`Your collection`)}</span><button type="button" class="ws-icon-button" data-workspace-action="characters" aria-label="${escape(t`Go to character collection`)}">${icon('plus')}</button></div><div id="workspace-favorites"></div></div>
             <div class="ws-sidebar-bottom">
@@ -114,8 +140,8 @@ function createShell() {
     hint.id = 'workspace-composer-hint';
     hint.innerHTML = `<button type="button" data-workspace-action="connections">${icon('plug')}<span id="workspace-composer-status"></span></button><span>Enter ↵</span>`;
     document.getElementById('form_sheld').append(hint);
-    // Keep each original drawer and its behavior; give it a visible title and close control.
-    document.querySelectorAll('#top-settings-holder > .drawer').forEach(drawer => {
+    // Character editing remains a temporary surface over the current page.
+    document.querySelectorAll('#rightNavHolder').forEach(drawer => {
         const panel = drawer.querySelector('.drawer-content');
         if (!panel) return;
         const heading = document.createElement('div');
@@ -189,15 +215,10 @@ function renderCollection() {
 function syncWorkspace() {
     const home = Boolean(document.querySelector('#chat .welcomePanel'));
     const title = home ? t`Home` : name2 || t`New chat`;
-    document.getElementById('workspace-page-title').textContent = title;
     document.getElementById('workspace-user-name').textContent = name1;
     document.getElementById('workspace-chat-name').textContent = selected_group ? groups.find(group => group.id === selected_group)?.name || title : title;
     document.getElementById('workspace-chat-subtitle').textContent = t`Your workspace`;
-    document.querySelectorAll('[data-workspace-action="home"]').forEach(button => {
-        button.classList.toggle('is-active', home);
-        if (button.matches('.ws-nav-link') && home) button.setAttribute('aria-current', 'page');
-        else button.removeAttribute('aria-current');
-    });
+    syncWorkspacePages();
     const date = document.querySelector('.ws-date');
     if (date) date.textContent = new Intl.DateTimeFormat(getCurrentLocale(), { month: 'short', day: 'numeric', weekday: 'short' }).format(new Date());
     renderCollection();
@@ -247,32 +268,26 @@ async function startCharacter(avatar) {
     if (getCurrentChatId() !== undefined && characters[this_chid]?.avatar === avatar) {
         setActiveCharacter(avatar);
         saveSettingsDebounced();
+        await navigateWorkspace('chat');
     }
     syncWorkspace();
     document.getElementById('send_textarea').focus();
 }
 
 async function handleAction(action) {
-    const panels = { characters: 'rightNavHolder', worlds: 'WI-SP-button', personas: 'persona-management-button', response: 'ai-config-button', formatting: 'advanced-formatting-button', connections: 'sys-settings-button', extensions: 'extensions-settings-button', settings: 'user-settings-button', backgrounds: 'backgrounds-button' };
-    if (panels[action]) return openPanel(panels[action]);
+    if (isWorkspacePage(action)) return navigateWorkspace(action);
     switch (action) {
         case 'home':
-            closePanels();
-            setNavigation(false);
-            if (await closeCurrentChat()) {
-                await openWelcomeScreen({ force: true });
-                document.getElementById('chat').scrollTop = 0;
-                const heading = document.querySelector('.ws-greeting h1');
-                heading?.setAttribute('tabindex', '-1');
-                heading?.focus({ preventScroll: true });
-            }
+            await navigateWorkspace('home');
             break;
+        case 'resume-chat': await navigateWorkspace('chat'); break;
         case 'assistant':
             closePanels();
             setNavigation(false);
             // Reuse the native transition, including the guard against active generation.
             if (await closeCurrentChat()) {
                 await newAssistantChat({ temporary: true });
+                await navigateWorkspace('chat');
                 document.getElementById('send_textarea').focus();
             }
             break;
@@ -283,6 +298,16 @@ async function handleAction(action) {
             document.getElementById(action === 'create' ? 'rm_button_create' : 'character_import_button').click();
             if (action === 'create') document.getElementById('character_name_pole').focus();
             break;
+        case 'character-tools':
+            await openPanel('rightNavHolder');
+            document.getElementById('rm_button_characters').click();
+            break;
+        case 'create-group':
+            await openPanel('rightNavHolder');
+            document.getElementById('rm_button_group_chats').click();
+            break;
+        case 'create-world': document.getElementById('world_create_button').click(); break;
+        case 'import-world': document.getElementById('world_import_button').click(); break;
         case 'search': showSearch(); break;
         case 'close-search': document.getElementById('workspace-search').close(); break;
         case 'close-panel': closePanels(); break;
@@ -321,9 +346,11 @@ function bindEvents() {
         const target = event.target instanceof Element ? event.target : null;
         const character = target?.closest('[data-workspace-character]');
         const action = target?.closest('[data-workspace-action]');
-        if (!character && !action) return;
+        const edit = target?.closest('[data-workspace-edit]');
+        const group = target?.closest('[data-workspace-group]');
+        if (!character && !action && !edit && !group) return;
         event.preventDefault();
-        const operation = character ? startCharacter(character.dataset.workspaceCharacter) : handleAction(action.dataset.workspaceAction);
+        const operation = edit ? editCharacter(edit.dataset.workspaceEdit) : group ? startGroup(group.dataset.workspaceGroup) : character ? startCharacter(character.dataset.workspaceCharacter) : handleAction(action.dataset.workspaceAction);
         Promise.resolve(operation).catch(error => {
             console.error('Workspace action failed:', error);
             toastr.error(t`Unable to complete this action. Please try again.`);
@@ -393,15 +420,44 @@ function bindEvents() {
     eventSource.on(event_types.ONLINE_STATUS_CHANGED, syncConnection);
 }
 
-function initializeWorkspace() {
+async function editCharacter(avatar) {
+    const id = characters.findIndex(character => character.avatar === avatar);
+    if (id < 0) return;
+    await selectCharacterById(id);
+    if (characters[this_chid]?.avatar !== avatar) return;
+    document.querySelector(`[data-workspace-edit="${CSS.escape(avatar)}"]`)?.focus({ preventScroll: true });
+    await openPanel('rightNavHolder');
+    document.getElementById('description_textarea').focus();
+}
+
+async function startGroup(id) {
+    if (selected_group === id || await openGroupById(id)) {
+        setActiveGroup(id);
+        saveSettingsDebounced();
+        await navigateWorkspace('chat');
+        document.getElementById('send_textarea').focus();
+    }
+}
+
+async function initializeWorkspace() {
     if (document.getElementById('workspace-shell')) return;
     if (getCurrentLocale().startsWith('zh')) addLocaleData(getCurrentLocale(), chinese);
     createShell();
+    initializeWorkspacePages({
+        home: async () => {
+            if (!await closeCurrentChat()) return false;
+            await openWelcomeScreen({ force: true });
+            document.getElementById('chat').scrollTop = 0;
+            return true;
+        },
+        beforeNavigate: () => { closePanels(); setNavigation(false); },
+    });
     document.documentElement.lang = getCurrentLocale();
     applyLocale(document);
     applyTheme(localStorage.getItem(themeStorageKey) === 'dark');
     bindEvents();
     syncWorkspace();
+    await restoreWorkspacePage();
     if (!/Mac|iPhone|iPad/.test(navigator.platform)) {
         document.querySelectorAll('#workspace-shell kbd').forEach(label => label.textContent = label.textContent.replace('⌘', 'Ctrl'));
     }

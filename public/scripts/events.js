@@ -95,6 +95,7 @@ export const event_types = {
     PRESET_RENAMED_BEFORE: 'preset_renamed_before',
     MAIN_API_CHANGED: 'main_api_changed',
     WORLDINFO_ENTRIES_LOADED: 'worldinfo_entries_loaded',
+    WORLDINFO_EDITOR_LOADED: 'worldinfo_editor_loaded',
     WORLDINFO_SCAN_DONE: 'worldinfo_scan_done',
     MEDIA_ATTACHMENT_DELETED: 'media_attachment_deleted',
     PERSONA_CHANGED: 'persona_changed',
