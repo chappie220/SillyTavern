@@ -1,52 +1,41 @@
 <div class="welcomePanel">
-    <div class="welcomeHeaderTitle">
-        <img src="img/logo.png" alt="SillyTavern Logo" data-i18n="[alt]SillyTavern Logo" class="welcomeHeaderLogo">
-        <span class="welcomeHeaderVersionDisplay">{{version}}</span>
-        <div class="mes_button showRecentChats" title="Show recent chats" data-i18n="[title]Show recent chats">
-            <i class="fa-solid fa-circle-chevron-down fa-fw fa-lg"></i>
-        </div>
-        <div class="mes_button recentChatsSettings" title="Recent chats settings" data-i18n="[title]Recent chats settings">
-            <i class="fa-solid fa-gear fa-fw fa-lg"></i>
-        </div>
-        <div class="mes_button hideRecentChats" title="Hide recent chats" data-i18n="[title]Hide recent chats">
-            <i class="fa-solid fa-circle-xmark fa-fw fa-lg"></i>
-        </div>
+    <div class="ws-greeting">
+        <div><h1 data-i18n="A little imagination starts here.">A little imagination starts here.</h1>
+        <p data-i18n="Your characters, your worlds, your next great conversation.">Your characters, your worlds, your next great conversation.</p></div>
+        <span class="ws-date"></span>
     </div>
-    <div class="welcomeHeader">
-        <div class="recentChatsTitle" data-i18n="Recent Chats">
-            Recent Chats
+    <section class="ws-story" aria-labelledby="ws-story-title">
+        <div class="ws-story-copy">
+            <span class="ws-story-caption"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span data-i18n="A space for your stories">A space for your stories</span></span>
+            <h2 id="ws-story-title" data-i18n="Where will the conversation take you?">Where will the<br>conversation take you?</h2>
+            <p data-i18n="Meet a character. Dream up a world. See what unfolds, one message at a time.">Meet a character. Dream up a world. See what unfolds, one message at a time.</p>
+            <button type="button" class="ws-button ws-primary" data-workspace-action="characters"><i class="fa-solid fa-comments" aria-hidden="true"></i><span data-i18n="Find a character">Find a character</span></button>
         </div>
-        <div class="welcomeShortcuts">
-            <a class="menu_button menu_button_icon" target="_blank" href="https://docs.sillytavern.app/">
-                <i class="fa-solid fa-question-circle"></i>
-                <span data-i18n="Docs">Docs</span>
-            </a>
-            <a class="menu_button menu_button_icon" target="_blank" href="https://github.com/SillyTavern/SillyTavern">
-                <i class="fa-brands fa-github"></i>
-                <span data-i18n="GitHub">GitHub</span>
-            </a>
-            <a class="menu_button menu_button_icon" target="_blank" href="https://discord.gg/sillytavern">
-                <i class="fa-brands fa-discord"></i>
-                <span data-i18n="Discord">Discord</span>
-            </a>
-            <span class="welcomeShortcutsSeparator">&vert;</span>
-            <button class="openTemporaryChat menu_button menu_button_icon">
-                <i class="fa-solid fa-comment-dots"></i>
-                <span data-i18n="Temporary Chat">Temporary Chat</span>
-            </button>
-        </div>
+        <img class="ws-story-art" src="img/workspace/story-landscape.svg" alt="" width="590" height="330">
+    </section>
+    <div class="ws-quick-actions">
+        <button type="button" data-workspace-action="assistant" class="ws-quick-action"><span class="ws-action-icon ws-iris"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i></span><span><strong data-i18n="Just start talking">Just start talking</strong><small data-i18n="An open canvas for any idea">An open canvas for any idea</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+        <button type="button" data-workspace-action="create" class="ws-quick-action"><span class="ws-action-icon ws-peach"><i class="fa-solid fa-pen-nib" aria-hidden="true"></i></span><span><strong data-i18n="Create a character">Create a character</strong><small data-i18n="Give a new personality a voice">Give a new personality a voice</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+        <button type="button" data-workspace-action="worlds" class="ws-quick-action"><span class="ws-action-icon ws-mint"><i class="fa-solid fa-book-open" aria-hidden="true"></i></span><span><strong data-i18n="Build a world">Build a world</strong><small data-i18n="Add a little depth to your stories">Add a little depth to your stories</small></span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+    </div>
+    <div class="welcomeHeader ws-section-heading">
+        <h2 class="recentChatsTitle" data-i18n="Recent Chats">Recent chats</h2>
+        <button type="button" class="ws-text-button showRecentChats"><i class="fa-solid fa-eye" aria-hidden="true"></i><span data-i18n="Show recent chats">Show recent chats</span></button>
+        <button type="button" class="ws-icon-button recentChatsSettings" title="Recent chats settings" aria-label="Recent chats settings" data-i18n="[title]Recent chats settings;[aria-label]Recent chats settings"><i class="fa-solid fa-sliders" aria-hidden="true"></i></button>
+        <button type="button" class="ws-icon-button hideRecentChats" title="Hide recent chats" aria-label="Hide recent chats" data-i18n="[title]Hide recent chats;[aria-label]Hide recent chats"><i class="fa-solid fa-eye-slash" aria-hidden="true"></i></button>
     </div>
     <div class="welcomeRecent">
         <div class="recentChatList">
         {{#if empty}}
             <div class="noRecentChat">
-                <i class="fa-solid fa-comment-dots"></i>
-                <span data-i18n="No recent chats">No recent chats</span>
+                <span class="ws-empty-icon"><i class="fa-solid fa-comments" aria-hidden="true"></i></span>
+                <div><strong data-i18n="Your next conversation belongs here">Your next conversation belongs here</strong><p data-i18n="Start a chat with a character and pick it up here anytime.">Start a chat with a character and pick it up here anytime.</p></div>
+                <button type="button" class="ws-text-button" data-workspace-action="characters"><span data-i18n="Start a chat">Start a chat</span><i class="fa-solid fa-plus" aria-hidden="true"></i></button>
             </div>
         {{/if}}
         {{#each chats}}
             {{#with this}}
-            <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{/if}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
+            <div class="recentChat {{#if hidden}}hidden{{/if}} {{#if is_group}}group{{/if}}" role="button" tabindex="0" aria-label="{{char_name}}: {{chat_name}}" data-file="{{chat_name}}" data-avatar="{{avatar}}" data-group="{{group}}">
                 {{#if pinned}}
                     <div class="recentChatPinned">
                         <i class="fa-solid fa-thumbtack fa-fw fa-xs" title="Pinned chat" data-i18n="[title]Pinned chat"></i>
@@ -98,4 +87,9 @@
         {{/if}}
         </div>
     </div>
+    <section class="ws-collection" aria-labelledby="ws-collection-title">
+        <div class="ws-section-heading"><h2 id="ws-collection-title" data-i18n="Your characters">Your characters</h2><button type="button" class="ws-text-button" data-workspace-action="characters"><span data-i18n="View all">View all</span><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button></div>
+        <div id="workspace-characters" class="ws-character-grid"></div>
+    </section>
+    <footer class="ws-home-footer"><span><img src="img/logo.png" width="18" height="18" alt=""><span data-i18n="Made for the stories only you can tell.">Made for the stories only you can tell.</span></span><div><a href="https://docs.sillytavern.app/" target="_blank" rel="noopener noreferrer" data-i18n="Documentation">Documentation</a><a href="https://discord.gg/sillytavern" target="_blank" rel="noopener noreferrer" data-i18n="Community">Community</a><span class="ws-version">{{version}}</span></div></footer>
 </div>
