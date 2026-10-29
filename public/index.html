@@ -5,16 +5,16 @@
     <title>SillyTavern</title>
     <base href="/">
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, viewport-fit=cover, initial-scale=1, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+    <meta name="viewport" content="width=device-width, viewport-fit=cover, initial-scale=1, interactive-widget=resizes-content">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="darkreader-lock">
     <meta name="robots" content="noindex, nofollow" />
-    <meta name="theme-color" content="#333">
+    <meta name="theme-color" content="#f5f7fb">
     <style>
         /* Put critical CSS here. The rest should go in stylesheets. */
         body {
-            background-color: rgb(36, 36, 37);
+            background-color: #f5f7fb;
         }
     </style>
     <link rel="preload" as="style" href="style.css">
@@ -44,11 +44,12 @@
     <link rel="stylesheet" type="text/css" href="css/mobile-styles.css">
     <link rel="stylesheet" type="text/css" href="css/macros.css">
     <link rel="stylesheet" type="text/css" href="css/user.css">
+    <link rel="stylesheet" type="text/css" href="css/workspace.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <!-- Scripts are loaded at the end of the body to improve page load speed -->
 </head>
 
-<body class="no-blur">
+<body class="no-blur workspace-ui">
     <div id="preloader"></div>
     <div id="bg1"></div>
     <div id="character_context_menu" class="hidden">
@@ -8216,6 +8217,7 @@
     <script type="module" src="lib/eventemitter.js"></script>
     <script type="module" src="scripts/i18n.js"></script>
     <script type="module" src="script.js"></script>
+    <script type="module" src="scripts/workspace.js"></script>
     <script>
         window.addEventListener('load', (event) => {
             const documentHeight = () => {
