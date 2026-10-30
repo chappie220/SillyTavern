@@ -127,6 +127,31 @@ describe('gateway-owned ST source loading', () => {
 });
 
 describe('gateway model parameter mapping', () => {
+    test.each(['openai', 'azure_openai'])('omits unsupported samplers from %s even when a connection override supplies them', source => {
+        const request = buildGatewayRequest({
+            chat_completion_source: source, [`${source}_model`]: 'gpt-4.1-mini',
+            temp_openai: 0.6, top_p_openai: 0.9,
+            top_k_openai: 0, min_p_openai: 0.1, top_a_openai: 0.2, repetition_penalty_openai: 1,
+        }, { top_k: 40, min_p: 0.3, top_a: 0.4, repetition_penalty: 1.2 });
+        expect(request).not.toHaveProperty('top_k');
+        expect(request).not.toHaveProperty('min_p');
+        expect(request).not.toHaveProperty('top_a');
+        expect(request).not.toHaveProperty('repetition_penalty');
+        expect(request.temperature).toBe(0.6);
+        expect(request.top_p).toBe(0.9);
+    });
+
+    test.each(['custom', 'openrouter'])('preserves provider samplers for %s', source => {
+        const request = buildGatewayRequest({
+            chat_completion_source: source, [`${source}_model`]: 'provider-model',
+            top_k_openai: 40, min_p_openai: 0.1, top_a_openai: 0.2, repetition_penalty_openai: 1.2,
+        });
+        expect(request.top_k).toBe(40);
+        expect(request.min_p).toBe(0.1);
+        expect(request.top_a).toBe(0.2);
+        expect(request.repetition_penalty).toBe(1.2);
+    });
+
     test('maps reasoning model output limits and forces direct nonstreaming text', () => {
         const request = buildGatewayRequest({ chat_completion_source: 'openai', openai_model: 'gpt-5', openai_max_tokens: 500, temp_openai: 0.5 }, { stream: true, tools: [{}] });
         expect(request.max_completion_tokens).toBe(500);

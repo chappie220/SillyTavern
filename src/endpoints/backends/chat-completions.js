@@ -2661,7 +2661,7 @@ export async function generateChatCompletion(request, response) {
             'presence_penalty': request.body.presence_penalty,
             'frequency_penalty': request.body.frequency_penalty,
             'top_p': request.body.top_p,
-            'top_k': request.body.top_k,
+            'top_k': request.body.chat_completion_source === CHAT_COMPLETION_SOURCES.OPENAI ? undefined : request.body.top_k,
             'stop': isTextCompletion === false ? request.body.stop : undefined,
             'logit_bias': request.body.logit_bias,
             'seed': request.body.seed,
