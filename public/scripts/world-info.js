@@ -2023,6 +2023,7 @@ export async function showWorldEditor(name) {
 
     const wiData = await loadWorldInfo(name);
     await displayWorldEntries(name, wiData);
+    await eventSource.emit(event_types.WORLDINFO_EDITOR_LOADED, { name });
 }
 
 /**

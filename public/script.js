@@ -10951,6 +10951,11 @@ function doDrawerOpenClick() {
  * @returns {Promise<void>}
  */
 export async function doNavbarIconClick() {
+    const workspaceRoute = $(this).closest('[data-workspace-route]').attr('data-workspace-route');
+    if (workspaceRoute && document.body.classList.contains('workspace-ui')) {
+        document.dispatchEvent(new CustomEvent('workspace:navigate', { detail: { route: workspaceRoute } }));
+        return;
+    }
     const icon = $(this).find('.drawer-icon');
     const drawer = $(this).parent().find('.drawer-content');
     const drawerWasOpenAlready = $(this).parent().find('.drawer-content').hasClass('openDrawer');
