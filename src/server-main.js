@@ -74,6 +74,7 @@ import { redirectDeprecatedEndpoints, ServerStartup, setupPrivateEndpoints } fro
 import { diskCache } from './endpoints/characters.js';
 import { migrateFlatSecrets } from './endpoints/secrets.js';
 import { migrateGroupChatsMetadataFormat } from './endpoints/groups.js';
+import { init as agentInit, onExit as agentOnExit, attachGateway } from './endpoints/agent.js';
 
 // Work around a node v20.0.0, v20.1.0, and v20.2.0 bug. The issue was fixed in v20.3.0.
 // https://github.com/nodejs/node/issues/47822#issuecomment-1564708870
@@ -212,6 +213,7 @@ if (!cliArgs.disableCsrf) {
 // Static files
 // Host index page
 app.get('/', cacheBuster.middleware, (request, response) => {
+    if (cliArgs.agentGatewayOnly) return response.json({ service: 'SillyTavern Agent Gateway', gateway: '/api/agent/gateway', api: '/api/agent' });
     if (shouldRedirectToLogin(request)) {
         const query = request.url.split('?')[1];
         const redirectUrl = query ? `/login?${query}` : '/login';
@@ -236,10 +238,12 @@ app.get('/callback/:source?', (request, response) => {
 app.get('/login', loginPageMiddleware);
 
 // Host frontend assets
-const webpackMiddleware = getWebpackServeMiddleware();
-app.use(webpackMiddleware);
-app.use(userCssMiddleware);
-app.use(express.static(path.join(serverDirectory, 'public'), {}));
+const webpackMiddleware = cliArgs.agentGatewayOnly ? null : getWebpackServeMiddleware();
+if (webpackMiddleware) {
+    app.use(webpackMiddleware);
+    app.use(userCssMiddleware);
+    app.use(express.static(path.join(serverDirectory, 'public'), {}));
+}
 
 // Public API
 app.use('/api/users', usersPublicRouter);
@@ -317,6 +321,7 @@ async function preSetupTasks() {
     const exitProcess = async () => {
         if (isExiting) return;
         isExiting = true;
+        await agentOnExit();
         await statsOnExit();
         if (typeof cleanupPlugins === 'function') {
             await cleanupPlugins();
@@ -350,8 +355,10 @@ async function preSetupTasks() {
     // Add request proxy.
     initRequestProxy({ enabled: cliArgs.requestProxyEnabled, url: cliArgs.requestProxyUrl, bypass: cliArgs.requestProxyBypass, enableKeepAlive: cliArgs.enableKeepAlive, privateRequestFilterEnabled: requestFilterOptions.enabled });
 
+    await agentInit();
+
     // Wait for frontend libs to compile
-    await webpackMiddleware.runWebpackCompiler({ pruneCache: true });
+    await webpackMiddleware?.runWebpackCompiler({ pruneCache: true });
 }
 
 /**
@@ -364,7 +371,7 @@ async function postSetupTasks(result) {
     const browserLaunchUrl = cliArgs.getBrowserLaunchUrl(browserLaunchHostname);
     const browserLaunchApp = String(getConfigValue('browserLaunch.browser', 'default') ?? '');
 
-    if (cliArgs.browserLaunchEnabled) {
+    if (!cliArgs.agentGatewayOnly && cliArgs.browserLaunchEnabled) {
         try {
             // TODO: This should be converted to a regular import when support for Node 18 is dropped
             const openModule = await import('open');
@@ -432,7 +439,7 @@ async function postSetupTasks(result) {
         );
     }
 
-    const goToLog = `Go to: ${color.blue(browserLaunchUrl)} to open SillyTavern`;
+    const goToLog = cliArgs.agentGatewayOnly ? `ST Agent Gateway API: ${color.blue(new URL('/api/agent', browserLaunchUrl))}` : `Go to: ${color.blue(browserLaunchUrl)} to open SillyTavern`;
     const plainGoToLog = removeColorFormatting(goToLog);
 
     console.log(logListen);
@@ -486,5 +493,5 @@ initUserStorage(globalThis.DATA_ROOT)
     .then(verifySecuritySettings)
     .then(preSetupTasks)
     .then(apply404Middleware)
-    .then(() => new ServerStartup(app, cliArgs).start())
+    .then(() => new ServerStartup(app, cliArgs, attachGateway).start())
     .then(postSetupTasks);

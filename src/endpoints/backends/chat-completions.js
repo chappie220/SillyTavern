@@ -2239,7 +2239,8 @@ router.post('/bias', async function (request, response) {
     }
 });
 
-router.post('/generate', async function (request, response) {
+/** Shared by interactive chat and the browser-independent ST agent runtime. */
+export async function generateChatCompletion(request, response) {
     try {
         if (!request.body) return response.status(400).send({ error: true });
 
@@ -2726,7 +2727,9 @@ router.post('/generate', async function (request, response) {
             response.end();
         }
     }
-});
+}
+
+router.post('/generate', generateChatCompletion);
 
 const multimodalModels = express.Router();
 

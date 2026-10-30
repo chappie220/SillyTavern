@@ -51,6 +51,7 @@ import { router as dataMaidRouter } from './endpoints/data-maid.js';
 import { router as backupsRouter } from './endpoints/backups.js';
 import { router as imageMetadataRouter } from './endpoints/image-metadata.js';
 import { router as volcengineRouter } from './endpoints/volcengine.js';
+import { router as agentRouter } from './endpoints/agent.js';
 
 /**
  * @typedef {object} ServerStartupResult
@@ -138,6 +139,7 @@ export function redirectDeprecatedEndpoints(app) {
  * @param {import('express').Express} app The Express app to use
  */
 export function setupPrivateEndpoints(app) {
+    app.use('/api/agent', agentRouter);
     app.use('/', userDataRouter);
     app.use('/api/users', usersPrivateRouter);
     app.use('/api/users', usersAdminRouter);
@@ -196,9 +198,10 @@ export class ServerStartup {
      * @param {import('express').Express} app The Express app to use
      * @param {import('./command-line.js').CommandLineArguments} cliArgs The command-line arguments
      */
-    constructor(app, cliArgs) {
+    constructor(app, cliArgs, onServer = () => {}) {
         this.app = app;
         this.cliArgs = cliArgs;
+        this.onServer = onServer;
     }
 
     /**
@@ -281,6 +284,7 @@ export class ServerStartup {
                 passphrase: String(this.cliArgs.keyPassphrase ?? ''),
             };
             const server = https.createServer(sslOptions, this.app);
+            this.onServer(server);
             server.on('error', reject);
             server.on('listening', resolve);
 
@@ -304,6 +308,7 @@ export class ServerStartup {
     #createHttpServer(url, ipVersion) {
         return new Promise((resolve, reject) => {
             const server = http.createServer(this.app);
+            this.onServer(server);
             server.on('error', reject);
             server.on('listening', resolve);
 

@@ -70,6 +70,8 @@ export const SECRET_KEYS = {
     VOLCENGINE_APP_ID: 'volcengine_app_id',
     VOLCENGINE_ACCESS_KEY: 'volcengine_access_key',
     WORKERS_AI: 'api_key_workers_ai',
+    AGENT_QQ: 'agent_qq_app_secret',
+    AGENT_MODEL_REQUEST: 'agent_model_request',
 };
 
 /**

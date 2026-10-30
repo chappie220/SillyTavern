@@ -20,6 +20,7 @@ import { initConfig } from './config-init.js';
  * @property {boolean} dnsPreferIPv6 If prefer IPv6 for DNS
  * @property {number} heartbeatInterval Interval in seconds to write a heartbeat file. 0 to disable.
  * @property {boolean} browserLaunchEnabled If automatically launch SillyTavern in the browser
+ * @property {boolean} agentGatewayOnly Run the agent gateway without frontend assets or compilation
  * @property {string} browserLaunchHostname Browser launch hostname
  * @property {number} browserLaunchPort Browser launch port override (-1 is use server port)
  * @property {boolean} browserLaunchAvoidLocalhost If avoid using 'localhost' for browser launch in auto mode
@@ -143,6 +144,11 @@ export class CommandLineParser {
                 type: 'boolean',
                 default: null,
                 describe: 'Automatically launch SillyTavern in the browser',
+            })
+            .option('agentGatewayOnly', {
+                type: 'boolean',
+                default: false,
+                describe: 'Run the ST agent gateway and APIs without frontend compilation or browser assets',
             })
             .option('browserLaunchHostname', {
                 type: 'string',
@@ -309,6 +315,7 @@ export class CommandLineParser {
             dnsPreferIPv6: cliArguments.dnsPreferIPv6 ?? getConfigValue('dnsPreferIPv6', defaultConfig.dnsPreferIPv6, 'boolean'),
             heartbeatInterval: cliArguments.heartbeatInterval ?? getConfigValue('heartbeatInterval', defaultConfig.heartbeatInterval, 'number'),
             browserLaunchEnabled: cliArguments.browserLaunchEnabled ?? cliArguments.autorun ?? getConfigValue('browserLaunch.enabled', defaultConfig.browserLaunchEnabled, 'boolean'),
+            agentGatewayOnly: cliArguments.agentGatewayOnly,
             browserLaunchHostname: cliArguments.browserLaunchHostname ?? cliArguments.autorunHostname ?? getConfigValue('browserLaunch.hostname', defaultConfig.browserLaunchHostname),
             browserLaunchPort: cliArguments.browserLaunchPort ?? cliArguments.autorunPortOverride ?? getConfigValue('browserLaunch.port', defaultConfig.browserLaunchPort, 'number'),
             browserLaunchAvoidLocalhost: cliArguments.browserLaunchAvoidLocalhost ?? cliArguments.avoidLocalhost ?? getConfigValue('browserLaunch.avoidLocalhost', defaultConfig.browserLaunchAvoidLocalhost, 'boolean'),

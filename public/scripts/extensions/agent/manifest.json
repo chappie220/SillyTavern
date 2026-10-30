@@ -1,0 +1,12 @@
+{
+    "display_name": "常驻 Agent / QQ",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "SillyTavern",
+    "version": "1.0.0",
+    "homePage": "https://docs.sillytavern.app/",
+    "hooks": { "activate": "init" }
+}

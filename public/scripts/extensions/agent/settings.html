@@ -1,0 +1,70 @@
+<div id="st_agent" class="extension_container">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>常驻 Agent / QQ</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <p class="st-agent-hint">由 ST 网关直接运行的后台主会话。角色、模型与世界书均在服务端加载，关闭网页后继续运行。</p>
+            <div id="st_agent_status" role="status" aria-live="polite">正在读取状态…</div>
+            <div id="st_agent_error" role="alert" class="st-agent-error"></div>
+            <div id="st_agent_binding" class="st-agent-hint">尚未配置网关角色与模型</div>
+            <label for="st_agent_character">网关角色</label>
+            <select id="st_agent_character" class="text_pole"></select>
+            <label for="st_agent_preset">网关预设</label>
+            <select id="st_agent_preset" class="text_pole"></select>
+            <div class="flex-container">
+                <button id="st_agent_bind" class="menu_button" type="button">应用网关角色与模型</button>
+                <button id="st_agent_open" class="menu_button" type="button">打开 main 主会话</button>
+            </div>
+            <small>网关读取 ST 已保存的聊天补全连接；每轮加载角色、预设与关键词世界书。页面仅显示网关实时推送的状态和回复。</small>
+            <label class="checkbox_label"><input id="st_agent_enabled" type="checkbox">启用后台常驻</label>
+            <label for="st_agent_context">上下文字符预算</label>
+            <input id="st_agent_context" class="text_pole" type="number" min="4000" max="500000" step="1000">
+            <small>请按模型上下文容量设置并为输出预留空间。长对话自动摘要，完整历史仍保留。</small>
+            <label for="st_agent_memory">长期记忆</label>
+            <textarea id="st_agent_memory" class="text_pole" rows="3" maxlength="16000" placeholder="希望主会话一直记住的偏好、目标或约定"></textarea>
+            <details>
+                <summary>QQ 官方机器人</summary>
+                <label class="checkbox_label"><input id="st_agent_qq_enabled" type="checkbox">连接 QQ 开放平台</label>
+                <label for="st_agent_appid">AppID</label>
+                <input id="st_agent_appid" class="text_pole" autocomplete="off">
+                <label for="st_agent_secret">AppSecret（留空保留已保存的密钥）</label>
+                <input id="st_agent_secret" class="text_pole masked-secret" type="text" autocomplete="off" spellcheck="false">
+                <label class="checkbox_label"><input id="st_agent_sandbox" type="checkbox">使用 QQ 沙箱环境</label>
+                <label for="st_agent_owner">我的用户 OpenID</label>
+                <input id="st_agent_owner" class="text_pole" autocomplete="off">
+                <small>只有此人的私聊进入 main。初次连接可留空：保存并启动后，在 QQ 私聊机器人，再选择下方发现的身份。这里填写机器人提供的 OpenID，而非 QQ 号码。</small>
+                <div id="st_agent_discovery" class="st-agent-hint"></div>
+                <button id="st_agent_use_sender" class="menu_button" type="button" hidden>设为我的 OpenID</button>
+                <label for="st_agent_groups">允许接入的群 OpenID（每行一个）</label>
+                <textarea id="st_agent_groups" class="text_pole" rows="2" placeholder="留空时不处理群聊"></textarea>
+                <small>获准的群通过 @ 机器人触发，每群拥有独立会话。</small>
+            </details>
+            <details>
+                <summary>心跳与定时任务</summary>
+                <label for="st_agent_heartbeat">心跳间隔（分钟，0 为关闭）</label>
+                <input id="st_agent_heartbeat" class="text_pole" type="number" min="0" max="10080">
+                <label for="st_agent_heartbeat_prompt">心跳提示</label>
+                <textarea id="st_agent_heartbeat_prompt" class="text_pole" rows="3" maxlength="8000"></textarea>
+                <label class="checkbox_label"><input id="st_agent_heartbeat_qq" type="checkbox">有事时通过 QQ 私聊通知我</label>
+                <small>心跳和任务会调用模型。主动推送能否送达取决于 QQ 平台权限和消息规则。</small>
+                <div id="st_agent_tasks"></div>
+                <label for="st_agent_task_prompt">新增任务</label>
+                <textarea id="st_agent_task_prompt" class="text_pole" rows="2" maxlength="8000" placeholder="例如：回顾近期计划，提醒我下一步要做什么"></textarea>
+                <label for="st_agent_task_at">首次执行时间（本地时区）</label>
+                <input id="st_agent_task_at" class="text_pole" type="datetime-local">
+                <label for="st_agent_task_interval">重复间隔（分钟，0 为一次性）</label>
+                <input id="st_agent_task_interval" class="text_pole" type="number" min="0" max="525600" value="0">
+                <label for="st_agent_task_target">结果发送到</label>
+                <select id="st_agent_task_target" class="text_pole"><option value="main">仅保存在 main</option><option value="qq">main 和我的 QQ</option></select>
+                <button id="st_agent_task_add" class="menu_button" type="button">添加任务</button>
+            </details>
+            <div class="flex-container">
+                <button id="st_agent_save" class="menu_button" type="button">保存并应用</button>
+                <button id="st_agent_retry" class="menu_button" type="button">重试失败任务</button>
+            </div>
+            <small>关闭此扩展的页面显示不会停止后台；停止运行请取消“启用后台常驻”并保存。</small>
+        </div>
+    </div>
+</div>

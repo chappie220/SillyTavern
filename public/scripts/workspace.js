@@ -22,7 +22,7 @@ const panelNames = {
 const themeStorageKey = 'SillyTavern.workspaceTheme';
 
 const chinese = {
-    'Home': '首页', 'Your workspace': '我的工作区', 'New chat': '新对话',
+    'Home': '首页', 'Your workspace': '我的工作区', 'New chat': '新对话', 'Main agent': '主会话 Agent',
     'Characters': '角色', 'World info': '世界书', 'Personas': '用户角色',
     'Tools & settings': '工具与设置', 'Response settings': '回复设置', 'Prompt format': '提示词格式',
     'Connections': '模型连接', 'Appearance': '外观', 'Your collection': '我的角色',
@@ -77,6 +77,7 @@ function createShell() {
             <button type="button" class="ws-new-chat" data-workspace-action="assistant">${icon('plus')}<span>${escape(t`New chat`)}</span><kbd>⌘ ↵</kbd></button>
             <nav class="ws-main-nav" aria-label="${escape(t`Your workspace`)}">
                 ${actionButton('home', 'house', t`Home`, 'is-active')}
+                ${actionButton('agent', 'robot', t`Main agent`)}
                 ${actionButton('characters', 'address-card', t`Characters`)}
                 ${actionButton('worlds', 'book-open', t`World info`)}
                 ${actionButton('personas', 'user', t`Personas`)}
@@ -256,6 +257,13 @@ async function handleAction(action) {
     const panels = { characters: 'rightNavHolder', worlds: 'WI-SP-button', personas: 'persona-management-button', response: 'ai-config-button', formatting: 'advanced-formatting-button', connections: 'sys-settings-button', extensions: 'extensions-settings-button', settings: 'user-settings-button', backgrounds: 'backgrounds-button' };
     if (panels[action]) return openPanel(panels[action]);
     switch (action) {
+        case 'agent': {
+            closePanels();
+            setNavigation(false);
+            const { openChat } = await import('./extensions/agent/index.js');
+            await openChat();
+            break;
+        }
         case 'home':
             closePanels();
             setNavigation(false);
