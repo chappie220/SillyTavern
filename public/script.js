@@ -276,6 +276,7 @@ import { initDataMaid } from './scripts/data-maid.js';
 import { clearItemizedPrompts, deleteItemizedPromptForMessage, deleteItemizedPrompts, findItemizedPromptSet, initItemizedPrompts, itemizedParams, itemizedPrompts, loadItemizedPrompts, promptItemize, replaceItemizedPromptText, saveItemizedPrompts, swapItemizedPrompts } from './scripts/itemized-prompts.js';
 import { getSystemMessageByType, initSystemMessages, SAFETY_CHAT, sendSystemMessage, system_message_types, system_messages } from './scripts/system-messages.js';
 import { event_types, eventSource } from './scripts/events.js';
+import { initAgentChat, generateAgentChat, acceptAgentChatSave, markAgentChatDirty, refreshAgentChat, getAgentChatModel } from './scripts/agent-chat.js';
 import { initAccessibility } from './scripts/a11y.js';
 import { applyStreamFadeIn } from './scripts/util/stream-fadein.js';
 import { initDomHandlers } from './scripts/dom-handlers.js';
@@ -787,6 +788,7 @@ async function firstLoadInit() {
     await eventSource.emit(event_types.APP_INITIALIZED);
     await initLoaderHandle.hide();
     await fixViewport();
+    initAgentChat();
     await eventSource.emit(event_types.APP_READY);
 }
 
@@ -4320,6 +4322,20 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
     // Occurs only if the generation is not aborted due to slash commands execution
     await eventSource.emit(event_types.GENERATION_AFTER_COMMANDS, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage }, dryRun);
 
+    if (!dryRun && !depth) {
+        try {
+            if (await generateAgentChat(type, signal ?? abortController.signal)) {
+                unblockGeneration(type);
+                await eventSource.emit(event_types.GENERATION_ENDED, chat.length - 1);
+                return;
+            }
+        } catch (error) {
+            unblockGeneration(type);
+            toastr.error(error.message);
+            return;
+        }
+    }
+
     if (main_api == 'kobold' && kai_settings.streaming_kobold && !kai_flags.can_use_streaming) {
         toastr.error(t`Streaming is enabled, but the version of Kobold used does not support token streaming.`, undefined, { timeOut: 10000, preventDuplicates: true });
         unblockGeneration(type);
@@ -7359,6 +7375,7 @@ async function renamePastChats(oldAvatar, newAvatar, newName) {
 }
 
 export function saveChatDebounced() {
+    markAgentChatDirty();
     const chid = this_chid;
     const selectedGroup = selected_group;
 
@@ -7423,6 +7440,8 @@ export async function saveChat({ chatName, withMetadata, mesId, force = false, c
         : (mesId !== undefined && mesId >= 0 && mesId < chat.length)
             ? chat.slice(0, Number(mesId) + 1)
             : chat.slice();
+    const savedMessages = structuredClone(trimmedChat);
+    markAgentChatDirty({ avatar: characters[this_chid].avatar, file: fileName });
 
     /** @type {ChatHeader} */
     const chatHeader = {
@@ -7447,10 +7466,16 @@ export async function saveChat({ chatName, withMetadata, mesId, force = false, c
         const result = await fetch('/api/chats/save', saveChatRequest);
 
         if (result.ok) {
-            return;
+            const saved = await result.json();
+            await acceptAgentChatSave(saved.agentChat, savedMessages);
+            return true;
         }
 
         const errorData = await result.json();
+        if (errorData?.error === 'agent_conflict') {
+            toastr.warning('后台已收到新消息，本次修改尚未保存。请重新载入聊天后再修改。');
+            throw new Error(errorData.message);
+        }
         const isIntegrityError = errorData?.error === 'integrity' && !force;
         if (!isIntegrityError) {
             throw new Error(result.statusText);
@@ -7476,6 +7501,7 @@ export async function saveChat({ chatName, withMetadata, mesId, force = false, c
     } catch (error) {
         console.error(error);
         toastr.error(t`Check the server connection and reload the page to prevent data loss.`, t`Chat could not be saved`);
+        return false;
     }
 }
 
@@ -8342,6 +8368,7 @@ async function messageEditCancel(messageId = this_edit_mes_id) {
     }
 
     showSwipeButtons();
+    await refreshAgentChat();
 }
 
 /**
@@ -10330,7 +10357,7 @@ export async function swipe(event, direction, { source, repeated, message = chat
         streamingProcessor.onStopStreaming();
     }
 
-    if (isHordeGenerationNotAllowed()) {
+    if (!getAgentChatModel() && isHordeGenerationNotAllowed()) {
         return unblockGeneration();
     }
 

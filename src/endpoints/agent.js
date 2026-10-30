@@ -20,11 +20,12 @@ let reconcileTimer;
 let closing = false;
 
 function createEntry(profile, directories) {
-    const store = new AgentStore(directories.root);
+    const store = new AgentStore(directories.root, directories);
     const entry = { store, profile, directories, control: Promise.resolve(), events: new EventEmitter() };
     entry.source = new GatewaySource(directories, () => JSON.parse(readSecret(directories, SECRET_KEYS.AGENT_MODEL_REQUEST) || '{}'));
     store.on('change', () => entry.events.emit('change'));
     entry.runtime = makeRuntime(entry);
+    store.on('chat-deleted', () => entry.runtime.stop().catch(error => console.error('Unable to stop deleted agent chat:', error)));
     agents.set(profile.handle, entry);
     return entry;
 }
@@ -55,7 +56,7 @@ function entryFor(request) {
 function publicState(entry) {
     const { binding, ...config } = entry.store.config;
     const queue = entry.store.state.queue.map(({ id, session, source, attempts, error }) => ({ id, session, source, attempts, error }));
-    let info = binding ? { mode: binding.mode ?? 'legacy', character: binding.character ?? '', preset: binding.preset ?? '', name: binding.name, model: binding.model, source: binding.source, capturedAt: binding.capturedAt } : null;
+    let info = binding ? { mode: binding.mode ?? 'legacy', character: binding.character ?? '', preset: binding.preset ?? '', chat: binding.chat, name: binding.name, model: binding.model, source: binding.source, capturedAt: binding.capturedAt } : null;
     if (binding?.mode === 'gateway') {
         try {
             const resolved = entry.source.resolve(binding);
@@ -71,7 +72,7 @@ function publicState(entry) {
 
 function sessionState(entry, key = 'main') {
     const session = entry.store.session(String(key));
-    return { key: session.key, summary: session.summary, messages: session.messages.filter(x => !x.silent).slice(-100) };
+    return { key: session.key, summary: session.summary, messages: session.messages.filter(x => !x.silent).slice(-100).map(({ native, ...message }) => message), chat: key === 'main' ? entry.store.chat.document() : undefined };
 }
 
 function retryJobs(entry) {
@@ -100,8 +101,9 @@ const gateway = new AgentGateway({
         switch (method) {
             case 'status': return publicState(entry);
             case 'session': return sessionState(entry, params.session);
-            case 'message': return entry.runtime.enqueue({ text: params.text, name: entry.profile.name || 'You', session: String(params.session ?? 'main'), source: 'gateway' });
+            case 'message': return entry.runtime.enqueue({ text: params.text, operation: params.operation, chat: params.chat, name: params.name || entry.profile.name || 'You', session: String(params.session ?? 'main'), source: 'gateway' });
             case 'retry': return retryJobs(entry);
+            case 'cancel': entry.runtime.cancel(params.id); return { cancelled: true };
             default: throw new Error('Unknown gateway method.');
         }
     },
@@ -138,6 +140,7 @@ async function reconcile() {
             await change(entry, async () => {
                 await entry.runtime.stop();
                 gateway.revoke(entry);
+                entry.store.chat.close();
                 agents.delete(handle);
             });
         }
@@ -170,6 +173,7 @@ export async function onExit() {
     clearInterval(reconcileTimer);
     gateway.close();
     await Promise.all([...agents.values()].map(entry => change(entry, () => entry.runtime.stop())));
+    for (const entry of agents.values()) entry.store.chat.close();
 }
 
 export const router = express.Router();
@@ -216,6 +220,8 @@ router.post('/config', route(async (req, res, entry) => {
 router.post('/bind', route(async (req, res, entry) => {
     await change(entry, async () => {
         const { binding, connection } = entry.source.bind(req.body);
+        if (!binding.chat && binding.character === entry.store.config.binding?.character) binding.chat = entry.store.config.binding.chat;
+        entry.store.chat.validate(binding);
         const config = validateConfig({ ...entry.store.config, binding });
         await restart(entry, config, () => writeSecret(entry.directories, SECRET_KEYS.AGENT_MODEL_REQUEST, JSON.stringify(connection)));
     });

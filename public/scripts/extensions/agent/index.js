@@ -1,8 +1,7 @@
-import { getRequestHeaders } from '../../../script.js';
+import { characters, this_chid, saveChat } from '../../../script.js';
 import { renderExtensionTemplateAsync } from '../../extensions.js';
-import { Popup, POPUP_TYPE } from '../../popup.js';
 import { uuidv4 } from '../../utils.js';
-import { AgentGatewayClient } from './gateway-client.js';
+import { agentGateway as gateway, agentHttp as http, onAgentState, currentAgentChat } from '../../agent-chat.js';
 
 let state;
 let tasks = [];
@@ -10,18 +9,6 @@ let panel;
 let refreshing = false;
 const connectionStates = { connected: '已连接', connecting: '连接中', reconnecting: '重连中', disconnected: '未连接' };
 const input = id => panel.querySelector(`#st_agent_${id}`);
-const gateway = new AgentGatewayClient({ getTicket: () => http('gateway-ticket', {}) });
-
-async function http(route, body) {
-    const response = await fetch(`/api/agent/${route}`, {
-        method: body === undefined ? 'GET' : 'POST',
-        headers: getRequestHeaders(),
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `请求失败：${response.status}`);
-    return data;
-}
 
 function api(route, body) {
     return ['status', 'message', 'retry'].includes(route) ? gateway.request(route, body) : http(route, body);
@@ -32,7 +19,7 @@ function showStatus() {
     input('status').textContent = `网关已连接 · ${status.running ? '后台运行中' : '后台已停止'} · ${status.busy ? '正在处理' : '空闲'} · 队列 ${status.queued} · QQ ${connectionStates[status.qq.state] ?? status.qq.state}`;
     input('error').textContent = status.lastError || status.qq.error || '';
     const binding = state.config.binding;
-    input('binding').textContent = binding ? `${binding.mode === 'gateway' ? '网关配置' : '旧快照'} · ${binding.name} · ${binding.source} / ${binding.model}` : '尚未配置网关角色与模型';
+    input('binding').textContent = binding ? `${binding.name} · ${binding.chat ? binding.chat.file : '尚未绑定角色聊天'} · ${binding.source} / ${binding.model}` : '尚未绑定角色聊天';
     input('secret').placeholder = state.hasQQSecret ? '已保存；留空不更改' : '尚未设置';
     const discovered = status.observedSender;
     input('discovery').textContent = discovered ? `最近收到：${discovered.openId}${discovered.groupId ? `（群：${discovered.groupId}）` : '（私聊）'}` : '';
@@ -41,7 +28,6 @@ function showStatus() {
 
 function fillForm() {
     const config = state.config;
-    input('character').value = config.binding?.character ?? '';
     input('preset').value = config.binding?.preset ?? '';
     input('enabled').checked = config.enabled;
     input('context').value = config.contextChars;
@@ -97,14 +83,17 @@ async function refresh() {
 }
 
 async function bind() {
-    state = await api('bind', { character: input('character').value, preset: input('preset').value });
+    const chat = currentAgentChat();
+    if (!chat) throw new Error('请先打开要作为 main 的角色聊天。');
+    if (await saveChat() === false) throw new Error('聊天尚未保存，请重试。');
+    state = await api('bind', { character: characters[this_chid].avatar, chat, preset: input('preset').value });
     showStatus();
-    toastr.success('网关已加载角色和模型配置，main 历史继续保留。');
+    toastr.success('当前角色聊天已设为 main，继续使用原来的聊天窗口即可。');
 }
 
 async function loadCatalog() {
     const catalog = await api('catalog');
-    for (const [id, values, empty] of [['character', catalog.characters, '通用助手（不使用角色卡）'], ['preset', catalog.presets, '跟随 ST 已保存的当前设置']]) {
+    for (const [id, values, empty] of [['preset', catalog.presets, '跟随 ST 已保存的当前设置']]) {
         input(id).replaceChildren();
         const option = document.createElement('option');
         option.value = '';
@@ -155,83 +144,6 @@ function addTask() {
     toastr.info('任务已添加，请点击“保存并应用”。');
 }
 
-export async function openChat() {
-    const view = document.createElement('div');
-    view.className = 'st-agent-chat';
-    view.innerHTML = '<h3>常驻 Agent</h3><select class="text_pole" aria-label="会话"><option value="main">main 主会话</option></select><div class="st-agent-chat-status" role="status"></div><div class="st-agent-transcript" role="log" aria-live="polite"></div><textarea class="text_pole" rows="3" maxlength="16000" aria-label="发送消息" placeholder="发给后台 Agent；你的 QQ 私聊也在 main 中"></textarea><button class="menu_button" type="button">发送</button>';
-    const selector = view.querySelector('select');
-    const transcript = view.querySelector('.st-agent-transcript');
-    const status = view.querySelector('.st-agent-chat-status');
-    const textarea = view.querySelector('textarea');
-    const send = view.querySelector('button');
-    let fingerprint;
-    let running = false;
-    send.disabled = true;
-    status.textContent = '正在连接 ST 网关…';
-    const unsubscribe = gateway.onSnapshot(latest => {
-        const session = latest.session;
-        if (session.key !== selector.value) return;
-        status.textContent = latest.status.lastError || `${latest.status.running ? '后台运行中' : '后台已停止'} · ${latest.status.busy ? '正在回复' : '空闲'} · 队列 ${latest.status.queued}`;
-        for (const item of latest.status.sessions) {
-            if ([...selector.options].some(x => x.value === item.key)) continue;
-            const option = document.createElement('option');
-            option.value = option.textContent = item.key;
-            selector.append(option);
-        }
-        const next = JSON.stringify(session.messages);
-        if (next !== fingerprint) {
-            const bottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 80;
-            transcript.replaceChildren();
-            for (const message of session.messages) {
-                const row = document.createElement('article');
-                row.className = 'st-agent-message';
-                row.dataset.role = message.role;
-                const heading = document.createElement('b');
-                heading.textContent = message.role === 'assistant' ? latest.config.binding?.name || 'Agent' : message.name;
-                const content = document.createElement('pre');
-                content.textContent = message.content;
-                const meta = document.createElement('small');
-                meta.textContent = `${message.source} · ${new Date(message.at).toLocaleString()}`;
-                row.append(heading, content, meta);
-                transcript.append(row);
-            }
-            if (!session.messages.length) transcript.textContent = '这是持久的主会话。启用后台后，即可在这里或 QQ 私聊中开始对话。';
-            if (bottom || !fingerprint) transcript.scrollTop = transcript.scrollHeight;
-            fingerprint = next;
-        }
-        running = latest.status.running;
-        send.disabled = !running;
-    });
-    const disconnect = gateway.onConnection(connected => {
-        if (!connected) {
-            status.textContent = '网关断开，正在重连…';
-            send.disabled = true;
-        }
-    });
-    send.addEventListener('click', async () => {
-        if (!textarea.value.trim()) return;
-        send.disabled = true;
-        try {
-            await api('message', { text: textarea.value, session: selector.value });
-            textarea.value = '';
-        } catch (error) {
-            status.textContent = error.message;
-        } finally {
-            send.disabled = !running;
-        }
-    });
-    const subscribe = () => gateway.request('subscribe', { session: selector.value }).catch(error => { status.textContent = error.message; });
-    selector.addEventListener('change', () => { fingerprint = undefined; subscribe(); });
-    try {
-        subscribe();
-        await new Popup(view, POPUP_TYPE.TEXT, '', { wide: true, large: true, okButton: '关闭' }).show();
-    } finally {
-        unsubscribe();
-        disconnect();
-        gateway.request('subscribe', { session: 'main' }).catch(() => {});
-    }
-}
-
 export async function init() {
     const html = await renderExtensionTemplateAsync('agent', 'settings');
     $('#extensions_settings').before(html);
@@ -250,11 +162,10 @@ export async function init() {
     }
     action('bind', bind);
     action('save', save);
-    action('open', openChat);
     action('task_add', addTask);
     action('retry', async () => { state = await api('retry', {}); showStatus(); });
     action('use_sender', () => { input('owner').value = state.status.observedSender.openId; toastr.info('已填写，请保存并应用。'); });
-    gateway.onSnapshot(latest => { state = latest; showStatus(); });
+    onAgentState(latest => { state = latest; showStatus(); });
     gateway.onConnection(connected => { if (!connected) input('status').textContent = '网关断开，正在重连…'; });
     await Promise.all([refresh(), loadCatalog()]);
     if (state) fillForm();

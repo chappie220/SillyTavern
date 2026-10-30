@@ -10,6 +10,7 @@ import { sync as writeFileAtomicSync } from 'write-file-atomic';
 import _ from 'lodash';
 
 import validateAvatarUrlMiddleware from '../middleware/validateFileName.js';
+import { getAgentChat } from '../agent/chat.js';
 import {
     getConfigValue,
     humanizedDateTime,
@@ -530,16 +531,18 @@ class IntegrityMismatchError extends Error {
  * @param {string} backupDirectory Passed to backupChat.
  */
 export async function trySaveChat(chatData, filePath, skipIntegrityCheck = false, handle, cardName, backupDirectory) {
-    const jsonlData = chatData?.map(m => JSON.stringify(m)).join('\n');
-
     const doIntegrityCheck = (checkIntegrity && !skipIntegrityCheck);
     const chatIntegritySlug = doIntegrityCheck ? chatData?.[0]?.chat_metadata?.integrity : undefined;
 
     if (chatIntegritySlug && !await checkChatIntegrity(filePath, chatIntegritySlug)) {
         throw new IntegrityMismatchError(`Chat integrity check failed for "${filePath}". The expected integrity slug was "${chatIntegritySlug}".`);
     }
-    tryWriteFileSync(filePath, jsonlData);
+    const agentChat = getAgentChat(filePath);
+    const saved = agentChat?.save(chatData);
+    const jsonlData = (saved ? [saved.header, ...saved.messages] : chatData)?.map(m => JSON.stringify(m)).join('\n');
+    if (!agentChat) tryWriteFileSync(filePath, jsonlData);
     getBackupFunction(handle, cardName)(backupDirectory, cardName, jsonlData);
+    return saved;
 }
 
 router.post('/save', validateAvatarUrlMiddleware, async function (request, response) {
@@ -554,12 +557,13 @@ router.post('/save', validateAvatarUrlMiddleware, async function (request, respo
         }
 
         if (Array.isArray(chatData)) {
-            await trySaveChat(chatData, chatFilePath, request.body.force, handle, cardName, request.user.directories.backups);
-            return response.send({ ok: true });
+            const agentChat = await trySaveChat(chatData, chatFilePath, request.body.force, handle, cardName, request.user.directories.backups);
+            return response.send({ ok: true, agentChat });
         } else {
             return response.status(400).send({ error: 'The request\'s body.chat is not an array.' });
         }
     } catch (error) {
+        if (error.code === 'agent_conflict') return response.status(409).send({ error: 'agent_conflict', message: error.message });
         if (error instanceof IntegrityMismatchError) {
             console.error(error.message);
             return response.status(400).send({ error: 'integrity' });
@@ -643,6 +647,12 @@ router.post('/rename', validateAvatarUrlMiddleware, async function (request, res
 
         fs.copyFileSync(pathToOriginalFile, pathToRenamedFile);
         fs.unlinkSync(pathToOriginalFile);
+        const agentChat = getAgentChat(pathToOriginalFile);
+        if (agentChat) {
+            const config = structuredClone(agentChat.store.config);
+            config.binding.chat.file = sanitizedFileName;
+            agentChat.store.saveConfig(config);
+        }
         console.info('Successfully renamed chat file.');
         return response.send({ ok: true, sanitizedFileName });
     } catch (error) {
@@ -665,6 +675,14 @@ router.post('/delete', validateAvatarUrlMiddleware, function (request, response)
         }
         //Return success if the file was deleted.
         if (tryDeleteFile(chatFilePath)) {
+            const agentChat = getAgentChat(chatFilePath);
+            if (agentChat) {
+                const config = structuredClone(agentChat.store.config);
+                config.enabled = false;
+                delete config.binding.chat;
+                agentChat.store.saveConfig(config);
+                agentChat.store.emit('chat-deleted');
+            }
             return response.send({ ok: true });
         } else {
             console.error('The chat file was not deleted.');

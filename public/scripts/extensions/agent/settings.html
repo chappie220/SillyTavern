@@ -5,19 +5,16 @@
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
         </div>
         <div class="inline-drawer-content">
-            <p class="st-agent-hint">由 ST 网关直接运行的后台主会话。角色、模型与世界书均在服务端加载，关闭网页后继续运行。</p>
+            <p class="st-agent-hint">将日常使用的角色聊天设为 main，继续使用原来的聊天窗口。QQ 私聊和后台任务也会写入这段聊天，关闭网页后由网关继续运行。</p>
             <div id="st_agent_status" role="status" aria-live="polite">正在读取状态…</div>
             <div id="st_agent_error" role="alert" class="st-agent-error"></div>
             <div id="st_agent_binding" class="st-agent-hint">尚未配置网关角色与模型</div>
-            <label for="st_agent_character">网关角色</label>
-            <select id="st_agent_character" class="text_pole"></select>
             <label for="st_agent_preset">网关预设</label>
             <select id="st_agent_preset" class="text_pole"></select>
             <div class="flex-container">
-                <button id="st_agent_bind" class="menu_button" type="button">应用网关角色与模型</button>
-                <button id="st_agent_open" class="menu_button" type="button">打开 main 主会话</button>
+                <button id="st_agent_bind" class="menu_button" type="button">将当前角色聊天设为 main</button>
             </div>
-            <small>网关读取 ST 已保存的聊天补全连接；每轮加载角色、预设与关键词世界书。页面仅显示网关实时推送的状态和回复。</small>
+            <small>先打开角色聊天，再到此处绑定。聊天记录、输入框、消息编辑与回复切换沿用 ST；生成由网关读取保存的模型连接、角色和世界书完成。</small>
             <label class="checkbox_label"><input id="st_agent_enabled" type="checkbox">启用后台常驻</label>
             <label for="st_agent_context">上下文字符预算</label>
             <input id="st_agent_context" class="text_pole" type="number" min="4000" max="500000" step="1000">

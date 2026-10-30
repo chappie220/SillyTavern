@@ -28,6 +28,8 @@ import {
 } from './power-user.js';
 
 import { selected_group, is_group_generating, openGroupById } from './group-chats.js';
+import { getAgentChatModel } from './agent-chat.js';
+import { event_types } from './events.js';
 import { getTagKeyForEntity, applyTagsOnCharacterSelect } from './tags.js';
 import {
     SECRET_KEYS,
@@ -322,7 +324,8 @@ export async function favsToHotswap() {
 
 //changes input bar and send button display depending on connection status
 function RA_checkOnlineStatus() {
-    if (online_status == 'no_connection') {
+    const gatewayConnected = Boolean(getAgentChatModel());
+    if (online_status == 'no_connection' && !gatewayConnected) {
         const send_textarea = $('#send_textarea');
         send_textarea.attr('placeholder', send_textarea.attr('no_connection_text')); //Input bar placeholder tells users they are not connected
         $('#send_form').addClass('no-connection');
@@ -333,7 +336,7 @@ function RA_checkOnlineStatus() {
         $('#API-status-top').addClass('fa-plug-circle-exclamation redOverlayGlow');
         connection_made = false;
     } else {
-        if (online_status !== undefined && online_status !== 'no_connection') {
+        if (gatewayConnected || online_status !== undefined && online_status !== 'no_connection') {
             const send_textarea = $('#send_textarea');
             send_textarea.attr('placeholder', send_textarea.attr('connected_text')); //on connect, placeholder tells user to type message
             $('#send_form').removeClass('no-connection');
@@ -346,6 +349,7 @@ function RA_checkOnlineStatus() {
                 $('#send_but').removeClass('displayNone'); //on connect, send button shows
                 $('#mes_continue').removeClass('displayNone'); //continue button is shown when connected
                 $('#mes_impersonate').removeClass('displayNone'); //continue button is shown when connected
+                if (gatewayConnected && online_status === 'no_connection') $('#mes_impersonate').addClass('displayNone');
             }
         }
     }
@@ -691,6 +695,7 @@ export const autoFitSendTextAreaDebounced = debounce(autoFitSendTextArea, deboun
 // ---------------------------------------------------
 
 export function initRossMods() {
+    eventSource.on(event_types.AGENT_STATUS_CHANGED, checkStatusDebounced);
     // initial status check
     checkStatusDebounced();
 

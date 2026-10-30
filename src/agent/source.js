@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { read as readCard } from '../character-card-parser.js';
 import { CHAT_COMPLETION_SOURCES } from '../constants.js';
+import { validateChatTarget } from './chat.js';
 
 const DEFAULT_ORDER = ['main', 'worldInfoBefore', 'personaDescription', 'charDescription', 'charPersonality', 'scenario', 'nsfw', 'worldInfoAfter', 'dialogueExamples', 'chatHistory', 'jailbreak'];
 const MODEL_FIELDS = { makersuite: 'google_model', vertexai: 'vertexai_model', azure_openai: 'azure_openai_model' };
@@ -135,6 +136,10 @@ export class GatewaySource {
             mode: 'gateway', character: input.character ? plainName(input.character) : '', preset: input.preset ? plainName(input.preset) : '',
             systemPrompt: String(input.systemPrompt ?? '').slice(0, 16000), capturedAt: new Date().toISOString(),
         };
+        if (input.chat) {
+            binding.chat = validateChatTarget(input.chat, binding.character);
+            this.resource(path.join(this.directory('chats', 'chats'), binding.character.replace('.png', '')), `${binding.chat.file}.jsonl`);
+        }
         const connection = input.connection ?? {};
         if (!connection || typeof connection !== 'object' || Array.isArray(connection) || JSON.stringify(connection).length > 100000) throw new Error('Invalid gateway connection configuration.');
         const resolved = this.resolve(binding, connection);

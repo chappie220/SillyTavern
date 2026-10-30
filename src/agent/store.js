@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { sync as writeFileAtomicSync } from 'write-file-atomic';
+import { AgentChat } from './chat.js';
 
 export const DEFAULT_CONFIG = {
     enabled: false,
@@ -65,11 +66,13 @@ export function validateConfig(input) {
 
 /** All files belong to one ST account; no browser or QQ identifier becomes a path. */
 export class AgentStore extends EventEmitter {
-    constructor(userRoot) {
+    constructor(userRoot, directories = { root: userRoot }) {
         super();
         this.root = path.join(userRoot, 'agent');
         this.config = this.read('config.json', DEFAULT_CONFIG);
         this.state = this.read('state.json', { sessions: {}, queue: [], completed: [], taskRuns: {}, lastHeartbeat: Date.now(), lastError: '' });
+        this.chat = new AgentChat(this, directories);
+        this.chat.bind(this.config.binding);
     }
 
     read(file, fallback) {
@@ -83,12 +86,17 @@ export class AgentStore extends EventEmitter {
     }
 
     saveConfig(config) {
+        const changedChat = JSON.stringify(this.config.binding?.chat) !== JSON.stringify(config.binding?.chat);
+        const migrate = !this.config.binding?.chat;
+        if (changedChat) this.chat.validate(config.binding);
         this.write('config.json', config);
         this.config = config;
+        if (changedChat) this.chat.bind(config.binding, { migrate });
         this.emit('change');
     }
 
     save() {
+        this.chat.flush();
         this.write('state.json', this.state);
         this.emit('change');
     }

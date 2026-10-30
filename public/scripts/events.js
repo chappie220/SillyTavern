@@ -77,6 +77,7 @@ export const event_types = {
     WORLDINFO_FORCE_ACTIVATE: 'worldinfo_force_activate',
     OPEN_CHARACTER_LIBRARY: 'open_character_library',
     ONLINE_STATUS_CHANGED: 'online_status_changed',
+    AGENT_STATUS_CHANGED: 'agent_status_changed',
     IMAGE_SWIPED: 'image_swiped',
     CONNECTION_PROFILE_LOADED: 'connection_profile_loaded',
     CONNECTION_PROFILE_CREATED: 'connection_profile_created',

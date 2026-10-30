@@ -7,6 +7,7 @@ import { addLocaleData, applyLocale, getCurrentLocale, t } from './i18n.js';
 import { openWelcomeScreen } from './welcome-screen.js';
 import { groups, openGroupById, selected_group } from './group-chats.js';
 import { initializeWorkspacePages, isWorkspacePage, navigateWorkspace, restoreWorkspacePage, syncWorkspacePages } from './workspace-pages.js';
+import { getAgentChatModel } from './agent-chat.js';
 
 const panelNames = {
     'ai-config-button': 'Response settings',
@@ -23,7 +24,7 @@ const panelNames = {
 const themeStorageKey = 'SillyTavern.workspaceTheme';
 
 const chinese = {
-    'Home': '首页', 'Your workspace': '我的工作区', 'New chat': '新对话', 'Main agent': '主会话 Agent',
+    'Home': '首页', 'Your workspace': '我的工作区', 'New chat': '新对话',
     'Characters': '角色', 'World info': '世界书', 'Personas': '用户角色',
     'Tools & settings': '工具与设置', 'Response settings': '回复设置', 'Prompt format': '提示词格式',
     'Connections': '模型连接', 'Appearance': '外观', 'Your collection': '我的角色',
@@ -102,7 +103,6 @@ function createShell() {
             <button type="button" class="ws-new-chat" data-workspace-action="assistant">${icon('plus')}<span>${escape(t`New chat`)}</span><kbd>⌘ ↵</kbd></button>
             <nav class="ws-main-nav" aria-label="${escape(t`Your workspace`)}">
                 ${actionButton('home', 'house', t`Home`, 'is-active')}
-                ${actionButton('agent', 'robot', t`Main agent`)}
                 ${actionButton('characters', 'address-card', t`Character library`)}
                 ${actionButton('worlds', 'book-open', t`World info`)}
                 ${actionButton('personas', 'user', t`Personas`)}
@@ -227,11 +227,12 @@ function syncWorkspace() {
 }
 
 function syncConnection() {
-    const connected = Boolean(online_status && online_status !== 'no_connection');
+    const agentModel = getAgentChatModel();
+    const connected = Boolean(agentModel || online_status && online_status !== 'no_connection');
     document.body.classList.toggle('ws-connected', connected);
     document.querySelectorAll('.ws-status-label').forEach(label => label.textContent = connected ? t`Connected` : t`Not connected`);
-    document.getElementById('workspace-composer-status').textContent = connected ? `${main_api} · ${online_status}` : t`Connect a model to start chatting`;
-    document.querySelector('.ws-connection-card small').textContent = connected ? online_status : t`Set up connection`;
+    document.getElementById('workspace-composer-status').textContent = agentModel || (connected ? `${main_api} · ${online_status}` : t`Connect a model to start chatting`);
+    document.querySelector('.ws-connection-card small').textContent = agentModel || (connected ? online_status : t`Set up connection`);
 }
 
 function renderSearch() {
@@ -278,13 +279,6 @@ async function startCharacter(avatar) {
 async function handleAction(action) {
     if (isWorkspacePage(action)) return navigateWorkspace(action);
     switch (action) {
-        case 'agent': {
-            closePanels();
-            setNavigation(false);
-            const { openChat } = await import('./extensions/agent/index.js');
-            await openChat();
-            break;
-        }
         case 'home':
             await navigateWorkspace('home');
             break;
@@ -426,6 +420,7 @@ function bindEvents() {
     }).observe(document.getElementById('chat'), { childList: true });
     [event_types.CHAT_CHANGED, event_types.CHAT_LOADED, event_types.CHARACTER_EDITED, event_types.CHARACTER_DELETED, event_types.CHARACTER_PAGE_LOADED, event_types.PERSONA_CHANGED].forEach(type => eventSource.on(type, syncWorkspace));
     eventSource.on(event_types.ONLINE_STATUS_CHANGED, syncConnection);
+    eventSource.on(event_types.AGENT_STATUS_CHANGED, syncConnection);
 }
 
 async function editCharacter(avatar) {
