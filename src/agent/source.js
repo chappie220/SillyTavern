@@ -50,6 +50,9 @@ export function buildGatewayRequest(settings, overrides = {}) {
         body.allow_fallbacks = settings.openrouter_allow_fallbacks;
     }
     Object.assign(body, overrides);
+    if (['openai', 'azure_openai'].includes(source)) {
+        for (const key of ['top_k', 'min_p', 'top_a', 'repetition_penalty']) delete body[key];
+    }
     if (!Number.isInteger(body.max_tokens) || body.max_tokens < 1 || body.max_tokens > 1000000) throw new Error('Invalid gateway output token limit.');
     if (['openai', 'azure_openai', 'openrouter'].includes(source) && /(?:^|\/)o[134]|gpt-5/.test(model)) {
         body.max_completion_tokens = body.max_tokens;
