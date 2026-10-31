@@ -49,6 +49,12 @@ export function markAgentChatDirty(target = currentAgentChat()) {
     if (matches(target) && matches(state?.config.binding?.chat)) dirty = true;
 }
 
+function displayedMessage(message) {
+    const extra = { ...message.extra };
+    delete extra.agent;
+    return JSON.stringify({ ...message, extra });
+}
+
 /** Reuse ST's own messages and renderer. Never replace a draft or an unsaved edit. */
 function synchronize(document, expected) {
     rendering = rendering.then(async () => {
@@ -61,10 +67,13 @@ function synchronize(document, expected) {
         dirty = false;
         if (next === local) return;
         const bottom = $('#chat')[0].scrollHeight - $('#chat')[0].scrollTop - $('#chat')[0].clientHeight < 100;
+        const previousLength = chat.length;
         let first = 0;
-        while (first < chat.length && first < document.messages.length && JSON.stringify(chat[first]) === JSON.stringify(document.messages[first])) first++;
+        while (first < chat.length && first < document.messages.length && displayedMessage(chat[first]) === displayedMessage(document.messages[first])) first++;
         const oldIds = new Set(chat.map(message => message.extra?.agent?.id));
         chat.splice(0, chat.length, ...structuredClone(document.messages));
+        // A native send renders its new message after saving. Server-only IDs must not render it a second time.
+        if (first === previousLength && first === chat.length) return;
         await redisplayChat({ startIndex: first, fade: false });
         if (bottom) scrollChatToBottom();
         for (let index = first; index < chat.length; index++) {
